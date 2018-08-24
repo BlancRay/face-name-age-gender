@@ -114,8 +114,9 @@ class dlibFace:
         # Get a reference to webcam #0 (the default one)
         # video_capture = cv2.VideoCapture(0)
         # video_capture = VideoStream(src=0).start()
-        video_capture = FileVideoStream(input).start()
-        # video_capture = FileVideoStream('http://172.16.4.169:4747/mjpegfeed?640x480').start()
+        # video_capture = FileVideoStream(input).start()
+        video_capture = FileVideoStream(
+            'rtsp://admin:adminVFIZVY@172.16.3.67:554/Streaming/Channels/101?transportmode=multicast').start()
         time.sleep(1)
 
         out = None
@@ -125,14 +126,14 @@ class dlibFace:
             frame = video_capture.read()
             # frame = imutils.resize(frame, width=720)
             (h, w) = frame.shape[:2]
-            (delta_h, delta_w) = (int(0.2 * h), int(0.3 * w))
-            frame = frame[delta_h:h - delta_h, delta_w:w - delta_w - 300]
-            (h, w) = frame.shape[:2]
+            # (delta_h, delta_w) = (int(0.2 * h), int(0.3 * w))
+            # frame = frame[delta_h:h - delta_h, delta_w:w - delta_w - 300]
+            # (h, w) = frame.shape[:2]
             # if out is None:
             #     out = cv2.VideoWriter(output, self.fourcc, 11, (w, h), True)
 
             count += 1
-            if count % SKIP_FRAMES == 0:
+            if count % SKIP_FRAMES != 0:
                 # cv2.imshow('Video', frame)
                 continue
 
@@ -151,45 +152,43 @@ class dlibFace:
 
                 # compute the (x, y)-coordinates of the bounding box for the object
                 # start1 = time.time()
-                # raw_landmark_set = self.r_model.pose_predictor_68_point(frame, d)
+                raw_landmark_set = self.r_model.pose_predictor_68_point(frame, d)
                 # end1 = time.time()
-                # face_encoding = np.array(
-                #     self.r_model.face_encoder.compute_face_descriptor(frame, raw_landmark_set))
+                face_encoding = np.array(
+                    self.r_model.face_encoder.compute_face_descriptor(frame, raw_landmark_set))
                 # print('encoding time %d\t%d' % ((end1 - start1) * 1000, (time.time() - end1) * 1000))
                 #
                 # # start2 = time.time()
                 # # See if the face is a match for the known face(s)
-                # results = self.r_model.face_distance(self.known_face_encodings, face_encoding)  # Euclidean distance
+                results = self.r_model.face_distance(self.known_face_encodings, face_encoding)  # Euclidean distance
                 # # end2 = time.time()
                 # # print('1NN time %d\t%d-1' % (((end2 - start2) * 1000), len(self.known_face_encodings)))
                 #
                 # # If a match was found in known_face_encodings, just use the first one.
-                # match_index = np.argmin(results)
-                # if results[match_index] > 0.5:
-                #     continue
-                # name = self.known_face_names[int(match_index)]
+                match_index = np.argmin(results)
+                if results[match_index] > 0.5:
+                    continue
+                name = self.known_face_names[int(match_index)]
                 # print(name, results[match_index])
 
                 # tf
                 faces[i, :, :, :] = fa.align(input_img, gray, detections[i])
                 ages, genders = self.sess.run([self.age, self.gender], feed_dict={
                     self.images_pl: faces, self.train_mode: False})
-                print(genders)
+                # print(genders)
                 age, gender = int(ages[i]), "女" if genders[i][0] > 0.5 else "男"
 
-                if abs(genders[i][0] - genders[i][1]) < 0.3:
-                    print('年龄%d,性别%s' % (age, '未知'))
-                else:
-                    print('年龄%d,性别%s' % (age, gender))
+                # if abs(genders[i][0] - genders[i][1]) < 0.3:
+                #     print('年龄%d,性别%s' % (age, '未知'))
+                # else:
+                #     print('年龄%d,性别%s' % (age, gender))
 
                 y = d.top() - 20 if d.top() - 20 > 20 else d.top() + 20
-                cv2.rectangle(frame, (d.left(), d.top()),
-                              (d.right(), d.bottom()),
-                              (0, 0, 255), 1)
+                cv2.rectangle(frame, (d.left(), d.top()), (d.right(), d.bottom()), (0, 0, 255), 1)
                 frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 draw = ImageDraw.Draw(frame)
-                # draw.text((d.left(), y), '%s,%d,%s' % (name,int(ages[0]), "女" if genders[0] == 0 else "男"), font=self.font, fill=(255, 0, 0))
-                draw.text((d.left(), y), '%d,%s' % (age, gender), font=self.font, fill=(255, 0, 0))
+                draw.text((d.left(), y), '%s,%d,%s' % (name, age, gender), font=self.font, fill=(255, 0, 0))
+                # draw.text((d.left(), y), '%d,%s' % (age, gender), font=self.font, fill=(255, 0, 0))
                 frame = cv2.cvtColor(np.asarray(frame), cv2.COLOR_RGB2BGR)
 
             # out.write(frame)
@@ -211,5 +210,5 @@ if __name__ == '__main__':
     model = dlibFace()
     video_path = r'video_test.mov'
     out_path = 'ag.avi'
-    model.train()
+    # model.train()
     model.video(video_path, out_path)
